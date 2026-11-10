@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏥 SOTE-Sairaalan Terveysjärjestelmä</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --accent: #8b5cf6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 20px;
+    }
+
+    .container { max-width: 1300px; margin: 0 auto; }
+
+    /* Kirjautumisen peitto */
+    .login-modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(15, 23, 42, 0.98);
+      backdrop-filter: blur(10px);
+      z-index: 9999;
+      display: flex; justify-content: center; align-items: center;
+      padding: 20px;
+    }
+    .login-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 32px;
+      width: 100%; max-width: 420px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      text-align: center;
+    }
+
+    .user-header-bar {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px 20px;
+      margin-bottom: 20px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .user-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #0f172a; padding: 6px 14px;
+      border-radius: 20px; border: 1px solid var(--accent);
+      font-weight: bold; color: var(--accent);
+    }
+
+    header { text-align: center; margin-bottom: 24px; border-bottom: 1px solid var(--card-border); padding-bottom: 16px; }
+    h1 { font-size: 2rem; color: var(--accent); margin-bottom: 8px; }
+    p.subtitle { color: var(--text-muted); font-size: 0.95rem; }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+      margin-bottom: 20px;
+    }
+
+    .form-group { margin-bottom: 14px; text-align: left; }
+    .form-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px; }
+    input[type="text"], input[type="password"], input[type="number"], select {
+      width: 100%; padding: 10px 12px;
+      background-color: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+    input:focus, select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
+    .btn {
+      padding: 8px 16px; border: none; border-radius: 6px;
+      font-weight: 600; cursor: pointer; font-size: 0.9rem;
+      transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-primary { background-color: var(--primary); color: white; }
+    .btn-success { background-color: var(--success); color: white; }
+    .btn-danger { background-color: var(--danger); color: white; }
+    .btn-secondary { background-color: #475569; color: white; }
+    .btn-accent { background-color: var(--accent); color: white; }
+
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+
+    .patient-card, .medicine-row, .price-row {
+      background: #111827;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    #loading-indicator {
+      position: fixed; top: 10px; right: 10px; background: var(--accent); color: white;
+      padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: bold; z-index: 10000; display: none;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-indicator"> Tallennetaan SOTE-tietoja...</div>
+
+<!-- SAIRAALAN KIRJAUTUMISMODAALI -->
+<div id="login-modal" class="login-modal-overlay">
+  <div class="login-box">
+    <h2 style="color:var(--accent); font-size:1.5rem; margin-bottom:8px;">🏥 SOTE / Sairaala</h2>
+    <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:20px;">Kirjaudu sisään sairaalan tunnuksilla.</p>
+    
+    <form onsubmit="performHospitalLogin(event)">
+      <div class="form-group">
+        <label>Käyttäjätili:</label>
+        <select id="login-account-select" required>
+          <option value="sote_hospital">🏥 SOTE / Sairaala</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Salasana:</label>
+        <input type="password" id="login-password-input" required placeholder="Syötä salasana">
+      </div>
+
+      <button type="submit" class="btn btn-accent" style="width:100%; margin-top:10px;">Kirjaudu Sairaalaan</button>
+    </form>
+  </div>
+</div>
+
+<div class="container">
+  <div class="user-header-bar">
+    <div>
+      <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">Kirjautunut käyttäjä:</span>
+      <span class="user-badge" id="current-user-badge">🏥 SOTE / Sairaala (Lääkäri)</span>
+    </div>
+    <button class="btn btn-sm btn-secondary" onclick="logoutHospital()">Kirjaudu Ulos</button>
+  </div>
+
+  <header>
+    <h1>🏥 SOTE-Sairaalan Terveysjärjestelmä</h1>
+    <p class="subtitle">Potilaat, hoitohinnasto, diagnoosit ja lääkevarasto</p>
+  </header>
+
+  <div class="grid-3">
+    <!-- SARAKE 1: POTILAAT -->
+    <div class="card">
+      <h2>Potilasrekisteri</h2>
+      <div id="hospital-patients-list"></div>
+    </div>
+
+    <!-- SARAKE 2: SAIRAUKSIEN HINNASTO -->
+    <div class="card">
+      <h2>💰 Hinnasto & Hoidon Arvot</h2>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">Määritä sairauskohtaiset hoitomaksut ja hinnat.</p>
+      
+      <div style="background:#111827; padding:12px; border-radius:8px; border:1px solid var(--card-border); margin-bottom:14px;">
+        <h3 style="font-size:0.9rem; color:#38bdf8; margin-bottom:8px;">Lisää uusi sairaus / hinta</h3>
+        <div class="form-group">
+          <label>Sairauden nimi:</label>
+          <input type="text" id="new-price-disease" placeholder="Esim. Keuhkokuume">
+        </div>
+        <div class="form-group">
+          <label>Hoidon arvo (€):</label>
+          <input type="number" id="new-price-value" step="5" placeholder="150">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addDiseasePrice()">Lisää hinnastoon</button>
+      </div>
+
+      <div id="hospital-prices-list"></div>
+    </div>
+
+    <!-- SARAKE 3: LÄÄKEVARASTO -->
+    <div class="card">
+      <h2>💊 Lääkevarasto</h2>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">Hallitse sairaalan lääkkeitä, hintoja ja määriä.</p>
+      
+      <div style="background:#111827; padding:12px; border-radius:8px; border:1px solid var(--card-border); margin-bottom:14px;">
+        <h3 style="font-size:0.9rem; color:#38bdf8; margin-bottom:8px;">Lisää lääke varastoon</h3>
+        <div class="form-group">
+          <label>Lääkkeen nimi:</label>
+          <input type="text" id="new-med-name" placeholder="Esim. Antibiootti">
+        </div>
+        <div class="form-group">
+          <label>Hinta (€):</label>
+          <input type="number" id="new-med-price" step="1" placeholder="25">
+        </div>
+        <div class="form-group">
+          <label>Määrä (kpl):</label>
+          <input type="number" id="new-med-qty" placeholder="50">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addMedicine()">Lisää lääke</button>
+      </div>
+
+      <div id="hospital-medicines-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- FIREBASE ALUSTUS -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCOenUQ2rrbM26yb6mDpOyHQv3sM35lw_k",
+    authDomain: "juup-ceac6.firebaseapp.com",
+    projectId: "juup-ceac6",
+    storageBucket: "juup-ceac6.firebasestorage.app",
+    messagingSenderId: "249269309742",
+    appId: "1:249269309742:web:26d7eccd91b01d9a8f6abf",
+    measurementId: "G-Z0HD8V5DLN"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  window.state = null;
+
+  window.initHospitalApp = async function() {
+    showLoading(true);
+    try {
+      const docRef = doc(db, "simulator", "main_state");
+      
+      onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const incomingData = docSnap.data();
+          window.state = incomingData;
+
+          if (!window.state.healthData) window.state.healthData = {};
+          
+          if (!window.state.diseasePrices) {
+            window.state.diseasePrices = [
+              { name: 'Alkeellinen luunmurtuma', price: 100 },
+              { name: 'Keuhkokuume', price: 150 },
+              { name: 'Syöpä', price: 500 },
+              { name: 'Sydänlihastulehdus', price: 300 },
+              { name: 'Alhainen verenpaine', price: 50 },
+              { name: 'Aivojen toiminnan lakkaaminen (3 kk)', price: 1000 }
+            ];
+          }
+
+          if (!window.state.medicines) {
+            window.state.medicines = [
+              { id: 1, name: 'Kipulääke', price: 10, qty: 100 },
+              { id: 2, name: 'Antibioottikuuri', price: 25, qty: 50 }
+            ];
+          }
+
+          if (window.state.citizens && Array.isArray(window.state.citizens)) {
+            window.state.citizens.forEach(c => {
+              if (!window.state.healthData[c.id]) {
+                window.state.healthData[c.id] = {
+                  status: 'Terve',
+                  disease: 'Ei sairausta',
+                  treatment: 'Ei hoitoa',
+                  checkupsCount: 0,
+                  doctorVisitsCount: 0
+                };
+              }
+            });
+          }
+
+          if (window.renderHospitalDashboard) {
+            window.renderHospitalDashboard();
+          }
+        }
+      });
+    } catch (e) {
+      console.error("Firebase-virhe:", e);
+    } finally {
+      showLoading(false);
+    }
+  };
+
+  window.saveHospitalState = async function() {
+    showLoading(true);
+    try {
+      await setDoc(doc(db, "simulator", "main_state"), window.state);
+    } catch (e) {
+      console.error("Virhe tallennettaessa:", e);
+    } finally {
+      showLoading(false);
+    }
+  };
+
+  function showLoading(show) {
+    const el = document.getElementById('loading-indicator');
+    if (el) el.style.display = show ? 'block' : 'none';
+  }
+
+  window.initHospitalApp();
+</script>
+
+<script>
+window.isLoggedIn = false;
+
+window.performHospitalLogin = function(e) {
+  e.preventDefault();
+  const pass = document.getElementById('login-password-input').value;
+
+  if (pass === 'Sairas321') {
+    window.isLoggedIn = true;
+    document.getElementById('login-modal').style.display = 'none';
+    document.getElementById('login-password-input').value = '';
+    window.renderHospitalDashboard();
+  } else {
+    alert('Virheellinen salasana!');
+  }
+}
+
+window.logoutHospital = function() {
+  window.isLoggedIn = false;
+  document.getElementById('login-modal').style.display = 'flex';
+}
+
+window.renderHospitalDashboard = function() {
+  if (!window.isLoggedIn || !window.state) return;
+
+  // 1. Potilaat
+  const container = document.getElementById('hospital-patients-list');
+  if (container && window.state.citizens) {
+    container.innerHTML = '';
+    if (!state.healthData) state.healthData = {};
+
+    state.citizens.forEach(c => {
+      if (!state.healthData[c.id]) {
+        state.healthData[c.id] = { status: 'Terve', disease: 'Ei sairausta', treatment: 'Ei hoitoa', checkupsCount: 0, doctorVisitsCount: 0 };
+      }
+      const h = state.healthData[c.id];
+      const isSick = h.status === 'Sairas';
+
+      // Etsitään sairauden hinta hinnastosta
+      let currentPriceText = '';
+      if (isSick && state.diseasePrices) {
+        const found = state.diseasePrices.find(p => p.name === h.disease);
+        if (found) {
+          currentPriceText = ` | Hoidon arvo: <strong style="color:var(--warning);">${found.price} €</strong>`;
+        }
+      }
+
+      container.innerHTML += `
+        <div class="patient-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <h3 style="color:#38bdf8; font-size:1rem;">#${c.id} ${c.name}</h3>
+            <span style="font-weight:bold; padding:3px 10px; border-radius:12px; font-size:0.75rem; background:${isSick ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'}; color:${isSick ? 'var(--danger)' : 'var(--success)'};">
+              ${isSick ? '⚠️ SAIRAS' : '✅ TERVE'}
+            </span>
+          </div>
+          <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">
+            Diagnoosi: <strong style="color:#f8fafc;">${h.disease}</strong>${currentPriceText}<br>
+            Viimeisin hoito: ${h.treatment || 'Ei kirjattu'}
+          </div>
+          
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <button class="btn btn-sm btn-primary" onclick="conductCheckup(${c.id})">🎲 Tarkastus</button>
+            ${isSick ? `<button class="btn btn-sm btn-success" onclick="applyTreatment(${c.id})">💊 Anna hoito</button>` : ''}
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  // 2. Hinnasto
+  const priceContainer = document.getElementById('hospital-prices-list');
+  if (priceContainer && window.state.diseasePrices) {
+    priceContainer.innerHTML = '';
+    state.diseasePrices.forEach((dp, index) => {
+      priceContainer.innerHTML += `
+        <div class="price-row" style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem;">
+          <div>
+            <strong>${dp.name}</strong><br>
+            <span style="color:var(--warning);">Hinta: ${dp.price} €</span>
+          </div>
+          <button class="btn btn-sm btn-danger" onclick="removeDiseasePrice(${index})">Poista</button>
+        </div>
+      `;
+    });
+  }
+
+  // 3. Lääkevarasto
+  const medContainer = document.getElementById('hospital-medicines-list');
+  if (medContainer && window.state.medicines) {
+    medContainer.innerHTML = '';
+    state.medicines.forEach((med, index) => {
+      medContainer.innerHTML += `
+        <div class="medicine-row" style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem;">
+          <div>
+            <strong>${med.name}</strong><br>
+            <span style="color:var(--text-muted);">Hinta: ${med.price} € | Määrä: ${med.qty} kpl</span>
+          </div>
+          <button class="btn btn-sm btn-danger" onclick="removeMedicine(${index})">Poista</button>
+        </div>
+      `;
+    });
+  }
+}
+
+window.conductCheckup = function(citId) {
+  if (!state.healthData) state.healthData = {};
+  if (!state.healthData[citId]) state.healthData[citId] = {};
+  
+  const h = state.healthData[citId];
+  h.checkupsCount = (h.checkupsCount || 0) + 1;
+
+  const rand = Math.random() * 100; // 0 - 100
+
+  if (rand < 1) {
+    h.status = 'Sairas';
+    h.disease = 'Aivojen toiminnan lakkaaminen (3 kk)';
+    alert(`Terveystarkastus: Vakava löydös! Potilaalla todettiin: Aivojen toiminnan lakkaaminen (3 kk)!`);
+  } else if (rand < 30) {
+    const diseases = [
+      'Alkeellinen luunmurtuma',
+      'Keuhkokuume',
+      'Syöpä',
+      'Sydänlihastulehdus',
+      'Alhainen verenpaine'
+    ];
+    const randomDisease = diseases[Math.floor(Math.random() * diseases.length)];
+    h.status = 'Sairas';
+    h.disease = randomDisease;
+    alert(`Terveystarkastus: Potilaalla todettiin sairaus: ${randomDisease}!`);
+  } else {
+    h.status = 'Terve';
+    h.disease = 'Ei sairausta';
+    alert('Terveystarkastus: Potilas on täysin terve!');
+  }
+
+  window.saveHospitalState();
+  renderHospitalDashboard();
+}
+
+window.applyTreatment = function(citId) {
+  const h = state.healthData[citId];
+  const diseaseName = h.disease;
+
+  // Haetaan sairauden hinta hinnastosta
+  let cost = 0;
+  if (state.diseasePrices) {
+    const found = state.diseasePrices.find(p => p.name === diseaseName);
+    if (found) cost = found.price;
+  }
+
+  h.status = 'Terve';
+  h.disease = 'Ei sairausta';
+  h.treatment = `${diseaseName} (Hinta: ${cost} €)`;
+  h.doctorVisitsCount = (h.doctorVisitsCount || 0) + 1;
+
+  // Siirretään hoidon hinta valtion/sairaalan kassaan jos mahdollista
+  state.stateBalance = (state.stateBalance || 0) + cost;
+
+  alert(`Hoito annettu! Sairaus: ${diseaseName}. Hoidon arvo/maksu: ${cost} € kirjattu sairaalaan.`);
+  window.saveHospitalState();
+  renderHospitalDashboard();
+}
+
+window.addDiseasePrice = function() {
+  const name = document.getElementById('new-price-disease').value.trim();
+  const price = Number(document.getElementById('new-price-value').value);
+
+  if (!name || isNaN(price)) {
+    alert('Täytä sairauden nimi ja hinta oikein!');
+    return;
+  }
+
+  if (!state.diseasePrices) state.diseasePrices = [];
+  state.diseasePrices.push({ name, price });
+
+  document.getElementById('new-price-disease').value = '';
+  document.getElementById('new-price-value').value = '';
+
+  window.saveHospitalState();
+  renderHospitalDashboard();
+}
+
+window.removeDiseasePrice = function(index) {
+  if (!state.diseasePrices) return;
+  state.diseasePrices.splice(index, 1);
+  window.saveHospitalState();
+  renderHospitalDashboard();
+}
+
+window.addMedicine = function() {
+  const name = document.getElementById('new-med-name').value.trim();
+  const price = Number(document.getElementById('new-med-price').value);
+  const qty = Number(document.getElementById('new-med-qty').value);
+
+  if (!name || isNaN(price) || isNaN(qty)) {
+    alert('Täytä kaikki lääkkeen kentät oikein!');
+    return;
+  }
+
+  if (!state.medicines) state.medicines = [];
+  state.medicines.push({ id: Date.now(), name, price, qty });
+
+  document.getElementById('new-med-name').value = '';
+  document.getElementById('new-med-price').value = '';
+  document.getElementById('new-med-qty').value = '';
+
+  window.saveHospitalState();
+  renderHospitalDashboard();
+}
+
+window.removeMedicine = function(index) {
+  if (!state.medicines) return;
+  state.medicines.splice(index, 1);
+  window.saveHospitalState();
+  renderHospitalDashboard();
+}
+</script>
+
+</body>
+</html>
